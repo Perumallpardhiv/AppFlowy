@@ -1,5 +1,7 @@
+import 'package:appflowy/ai/widgets/loading_indicator.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/ai_chat/application/chat_ai_message_bloc.dart';
+import 'package:appflowy/plugins/ai_chat/application/chat_bloc.dart';
 import 'package:appflowy/plugins/ai_chat/application/chat_entity.dart';
 import 'package:appflowy/plugins/ai_chat/application/chat_message_stream.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -14,7 +16,6 @@ import '../layout_define.dart';
 import 'ai_markdown_text.dart';
 import 'ai_message_bubble.dart';
 import 'ai_metadata.dart';
-import 'loading_indicator.dart';
 import 'error_text_message.dart';
 
 /// [ChatAIMessageWidget] includes both the text of the AI response as well as
@@ -67,58 +68,68 @@ class ChatAIMessageWidget extends StatelessWidget {
           final loadingText =
               state.progress?.step ?? LocaleKeys.chat_generatingResponse.tr();
 
-          return Padding(
-            padding: AIChatUILayout.messageMargin,
-            child: state.messageState.when(
-              loading: () => ChatAIMessageBubble(
-                message: message,
-                showActions: false,
-                child: ChatAILoading(text: loadingText),
-              ),
-              ready: () {
-                return state.text.isEmpty
-                    ? ChatAIMessageBubble(
-                        message: message,
-                        showActions: false,
-                        child: ChatAILoading(text: loadingText),
-                      )
-                    : ChatAIMessageBubble(
-                        message: message,
-                        isLastMessage: isLastMessage,
-                        showActions: stream == null &&
-                            state.text.isNotEmpty &&
-                            !isStreaming,
-                        onRegenerate: onRegenerate,
-                        onChangeFormat: onChangeFormat,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            IgnorePointer(
-                              ignoring: UniversalPlatform.isMobile,
-                              child: AIMarkdownText(markdown: state.text),
-                            ),
-                            if (state.sources.isNotEmpty)
-                              AIMessageMetadata(
-                                sources: state.sources,
-                                onSelectedMetadata: onSelectedMetadata,
+          return BlocListener<ChatBloc, ChatState>(
+            listenWhen: (previous, current) =>
+                previous.clearErrorMessages != current.clearErrorMessages,
+            listener: (context, chatState) {
+              if (state.stream?.error?.isEmpty != false) {
+                return;
+              }
+              context.read<ChatBloc>().add(ChatEvent.deleteMessage(message));
+            },
+            child: Padding(
+              padding: AIChatUILayout.messageMargin,
+              child: state.messageState.when(
+                loading: () => ChatAIMessageBubble(
+                  message: message,
+                  showActions: false,
+                  child: AILoadingIndicator(text: loadingText),
+                ),
+                ready: () {
+                  return state.text.isEmpty
+                      ? ChatAIMessageBubble(
+                          message: message,
+                          showActions: false,
+                          child: AILoadingIndicator(text: loadingText),
+                        )
+                      : ChatAIMessageBubble(
+                          message: message,
+                          isLastMessage: isLastMessage,
+                          showActions: stream == null &&
+                              state.text.isNotEmpty &&
+                              !isStreaming,
+                          onRegenerate: onRegenerate,
+                          onChangeFormat: onChangeFormat,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              IgnorePointer(
+                                ignoring: UniversalPlatform.isMobile,
+                                child: AIMarkdownText(markdown: state.text),
                               ),
-                            if (state.sources.isNotEmpty && !isLastMessage)
-                              const VSpace(8.0),
-                          ],
-                        ),
-                      );
-              },
-              onError: (error) {
-                return ChatErrorMessageWidget(
-                  errorMessage: LocaleKeys.chat_aiServerUnavailable.tr(),
-                );
-              },
-              onAIResponseLimit: () {
-                return ChatErrorMessageWidget(
-                  errorMessage:
-                      LocaleKeys.sideBar_askOwnerToUpgradeToAIMax.tr(),
-                );
-              },
+                              if (state.sources.isNotEmpty)
+                                AIMessageMetadata(
+                                  sources: state.sources,
+                                  onSelectedMetadata: onSelectedMetadata,
+                                ),
+                              if (state.sources.isNotEmpty && !isLastMessage)
+                                const VSpace(8.0),
+                            ],
+                          ),
+                        );
+                },
+                onError: (error) {
+                  return ChatErrorMessageWidget(
+                    errorMessage: LocaleKeys.chat_aiServerUnavailable.tr(),
+                  );
+                },
+                onAIResponseLimit: () {
+                  return ChatErrorMessageWidget(
+                    errorMessage:
+                        LocaleKeys.sideBar_askOwnerToUpgradeToAIMax.tr(),
+                  );
+                },
+              ),
             ),
           );
         },

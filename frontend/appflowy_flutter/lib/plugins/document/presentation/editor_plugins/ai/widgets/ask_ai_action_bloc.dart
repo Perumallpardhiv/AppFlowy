@@ -1,11 +1,10 @@
 import 'dart:async';
 
-import 'package:appflowy/ai/ai_client.dart';
-import 'package:appflowy/ai/error.dart';
-import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/widgets/ask_ai_action.dart';
+import 'package:appflowy/ai/service/ai_client.dart';
+import 'package:appflowy/ai/service/error.dart';
 import 'package:appflowy/plugins/document/presentation/editor_plugins/plugins.dart';
 import 'package:appflowy/shared/markdown_to_document.dart';
-import 'package:appflowy/ai/appflowy_ai_service.dart';
+import 'package:appflowy/ai/service/appflowy_ai_service.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -25,6 +24,7 @@ class AskAIActionBloc extends Bloc<AskAIEvent, AskAIState> {
     required this.node,
     required this.editorState,
     required this.action,
+    required this.objectId,
     this.enableLogging = true,
   }) : super(
           AskAIState.initial(action),
@@ -73,6 +73,7 @@ class AskAIActionBloc extends Bloc<AskAIEvent, AskAIState> {
   // used to wait for the aiRepository to be initialized
   final aiRepositoryCompleter = Completer();
   late final AIRepository aiRepository;
+  final String objectId;
 
   bool isCanceled = false;
 
@@ -91,6 +92,7 @@ class AskAIActionBloc extends Bloc<AskAIEvent, AskAIState> {
 
     final content = node.attributes[AskAIBlockKeys.content] as String;
     await aiRepository.streamCompletion(
+      objectId: objectId,
       text: content,
       completionType: completionTypeFromInt(state.action),
       onStart: () async {
